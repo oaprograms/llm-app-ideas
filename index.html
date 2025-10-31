@@ -73,9 +73,10 @@
     }
 </style>
 <body>
-<label>App ideas: for ChatGPT apps (or general)</label>
+<label>From Chats to Apps: LLM-Generated App Ideas Using the LMSYS-Chat-1M Corpus</label>
 <!--<input id="q" type="search" placeholder="Search" autocomplete="off" />-->
 <div id="tags" class="tags" aria-label="Tag filters"></div>
+<div style="padding-top: 5px; text-align: right;">Language: <button id="lang_en" class="tag active" style="margin-right: 5px;">English</button><button id="lang_sr" class="tag">Srpski</button></div>
 <ul id="results"></ul>
 <script>
     const q = document.getElementById('q');
@@ -199,7 +200,7 @@
 
     let activeTag = null;
     let ideas = [];
-    let lang = 'sr';
+    let lang = 'en';
 
     tagsEl.addEventListener('click', (e) => {
         const btn = e.target.closest('button.tag');
@@ -231,6 +232,27 @@
             ul.innerHTML = `<li><em>Failed to load ideas.json</em></li>`;
             console.error(err);
         });
+
+    const langButtons = {
+        en: document.getElementById('lang_en'),
+        sr: document.getElementById('lang_sr'),
+    };
+
+    function setLanguage(newLang) {
+        lang = newLang;
+
+        // Update active button
+        for (const [code, btn] of Object.entries(langButtons)) {
+            btn.classList.toggle('active', code === newLang);
+        }
+
+        // Re-render results
+        render(ideas, activeTag, lang);
+    }
+
+    // Attach event listeners
+    langButtons.en.addEventListener('click', () => setLanguage('en'));
+    langButtons.sr.addEventListener('click', () => setLanguage('sr'));
 </script>
 </body>
 </html>
