@@ -129,15 +129,7 @@
         ul.innerHTML = filtered.length
             ? filtered.map((r) => `
             <li>
-                <div style="font-weight: 550;">${escapeHtml(lang === 'en' ? r.userNeed : (r.userNeed_sr || r.userNeed))}</div>
-                <div style="display: none;"><b>App name:</b> ${escapeHtml(r.softwareName)}</div>
-                <div style="opacity: 0.55;">[llm's app idea]: ${escapeHtml(r.description)}</div>
-                <div class="idea-tags">
-                    ${(r.tags || []).map((t) =>
-                    `<span class="idea-tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</span>`
-                ).join('')}
-                    <span class="chance-val">Chance val: ${llmLevels.length - llmLevels.indexOf(r.llmCanDoIt ?? '')}</span>
-                </div>
+                <div>${escapeHtml(lang === 'en' ? r.userNeed : (r.userNeed_sr || r.userNeed))}</div>
             </li>`
             ).join('')
             : `<li><em>No results.</em></li>`;
