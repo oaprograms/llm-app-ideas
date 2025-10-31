@@ -71,162 +71,139 @@
     div {
         padding-bottom: 7px;
     }
+    .chance-val {
+        opacity: 0.6;
+        align-self: anchor-center;
+        margin-left: 8px;
+        font-size: 14px;
+    }
 </style>
 <body>
 <label>From Chats to Apps: LLM-Generated App Ideas Using the LMSYS-Chat-1M Corpus</label>
 <!--<input id="q" type="search" placeholder="Search" autocomplete="off" />-->
+<div style="margin-top: 8px; text-align: right;">Language: <button id="lang_en" class="tag active" style="margin-right: 5px;">English</button><button id="lang_sr" class="tag">Srpski</button></div>
+<div style="margin-top: 8px;">Chance LLMs can already do it: <div style="display: inline-flex; margin-left: 8px; margin-top: 0;" id="llm-filters" class="tags" aria-label="LLM filters"></div></div>
 <div id="tags" class="tags" aria-label="Tag filters"></div>
-<div style="padding-top: 5px; text-align: right;">Language: <button id="lang_en" class="tag active" style="margin-right: 5px;">English</button><button id="lang_sr" class="tag">Srpski</button></div>
 <ul id="results"></ul>
 <script>
-    const q = document.getElementById('q');
     const ul = document.getElementById('results');
     const tagsEl = document.getElementById('tags');
+    const llmFiltersEl = document.getElementById('llm-filters');
     const ALL = 'All';
 
     const escapeHtml = (s) =>
-        s.replace(
-            /[&<>"']/g,
-            (c) =>
-                ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;',
-                })[c],
-        );
+        s.replace(/[&<>"']/g, (c) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+        }[c]));
 
     const tags = [
-        'AI/ML',
-        'LLM',
-        'Code Generation',
-        'Data Extraction',
-        'Financial Tech',
-        'Trading',
-        'E-commerce',
-        'Health Tech',
-        'Mental Wellness',
-        'Legal Tech',
-        'Compliance',
-        'Automation',
-        'Visualization',
-        'DevOps',
-        'Gaming',
-        'Education',
-        'IoT/Hardware',
-        'Security',
-        'Content Creation',
-        'Personalized Advice',
-        'Engineering',
+        'AI/ML', 'LLM', 'Code Generation', 'Data Extraction', 'Financial Tech', 'Trading',
+        'E-commerce', 'Health Tech', 'Mental Wellness', 'Legal Tech', 'Compliance', 'Automation',
+        'Visualization', 'DevOps', 'Gaming', 'Education', 'IoT/Hardware', 'Security',
+        'Content Creation', 'Personalized Advice', 'Engineering'
     ];
+
+    const llmLevels = [
+        ALL, 'LIKELY', 'SOMEWHAT LIKELY',
+        'NEUTRAL / UNSURE', 'SOMEWHAT UNLIKELY', 'UNLIKELY',
+        'VERY UNLIKELY', 'EXTREMELY UNLIKELY', 'IMPOSSIBLE'
+    ];
+
+    let ideas = [];
+    let activeTag = null;
+    let lang = 'en';
+    let activeLLMLevel = ALL;
 
     function getScore(idea) {
         let score = Math.floor((idea.score || 0) / 4);
-        if (
-            idea.devLen === 'LESS THAN A WEEK' ||
-            idea.devLen === 'LESS THAN A MONTH'
-        ) {
-            score += 3;
-        }
-        if (
-            idea.numUsers === '1 thousand or less' ||
-            idea.numUsers === '10 thousand'
-        ) {
-            score = 0;
-        }
+        if (idea.devLen === 'LESS THAN A WEEK' || idea.devLen === 'LESS THAN A MONTH') score += 3;
+        if (idea.numUsers === '1 thousand or less' || idea.numUsers === '10 thousand') score = 0;
         return score;
     }
 
-    const render = (rows, tag, lang) => {
-        const filtered = tag
-            ? rows.filter((r) => (r.tags || []).includes(tag))
-            : rows;
+    function render(rows, tag, lang) {
+        const filtered = rows.filter((r) =>
+            (!tag || (r.tags || []).includes(tag)) &&
+            (activeLLMLevel === ALL || r.llmCanDoIt === activeLLMLevel)
+        );
         ul.innerHTML = filtered.length
-            ? filtered
-                .map(
-                    (r) => `<li>
-  <div style="font-weight: 550;">${escapeHtml(lang === 'en' ? r.userNeed : (r.userNeed_sr || r.userNeed))}</div>
-  <div style="display: none;"><b>App name:</b> ${escapeHtml(r.softwareName)}</div>
-  <div style="opacity: 0.6;">[app idea]: ${escapeHtml(r.description)}</div>
-  <div class="idea-tags">
-    ${(r.tags || [])
-                        .map(
-                            (t) =>
-                                `<span class="idea-tag" data-tag="${escapeHtml(
-                                    t,
-                                )}">${escapeHtml(t)}</span>`,
-                        )
-                        .join('')}
-  </div>
-</li>`,
-                )
-                .join('')
+            ? filtered.map((r) => `
+            <li>
+                <div style="font-weight: 550;">${escapeHtml(lang === 'en' ? r.userNeed : (r.userNeed_sr || r.userNeed))}</div>
+                <div style="display: none;"><b>App name:</b> ${escapeHtml(r.softwareName)}</div>
+                <div style="opacity: 0.55;">[llm's app idea]: ${escapeHtml(r.description)}</div>
+                <div class="idea-tags">
+                    ${(r.tags || []).map((t) =>
+                    `<span class="idea-tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</span>`
+                ).join('')}
+                    <span class="chance-val">Chance val: ${llmLevels.length - llmLevels.indexOf(r.llmCanDoIt ?? '')}</span>
+                </div>
+            </li>`
+            ).join('')
             : `<li><em>No results.</em></li>`;
-    };
+    }
 
-    const countTags = (rows) => {
+    function countTags(rows) {
         const counts = {};
         for (const r of rows) {
-            for (const t of r.tags || []) {
-                counts[t] = (counts[t] || 0) + 1;
-            }
+            if (activeLLMLevel !== ALL && r.llmCanDoIt !== activeLLMLevel) continue;
+            for (const t of r.tags || []) counts[t] = (counts[t] || 0) + 1;
         }
         return counts;
-    };
+    }
 
-    const renderTags = (activeTag, counts) => {
+    function renderTags(activeTag, counts) {
         const list = [ALL, ...tags];
-        const total = ideas.length;
-        tagsEl.innerHTML = list
-            .map((t) => {
-                const isActive = activeTag
-                    ? t === activeTag
-                    : t === ALL;
-                const n =
-                    t === ALL
-                        ? total
-                        : counts && counts[t]
-                            ? counts[t]
-                            : 0;
-                return `<button type="button" class="tag${
-                    isActive ? ' active' : ''
-                }" data-tag="${escapeHtml(t)}">${escapeHtml(
-                    t,
-                )} <span>[${n}]</span></button>`;
-            })
-            .join('');
-    };
+        const total = ideas.filter(i => activeLLMLevel === ALL || i.llmCanDoIt === activeLLMLevel).length;
+        tagsEl.innerHTML = list.map((t) => {
+            const isActive = activeTag ? t === activeTag : t === ALL;
+            const n = t === ALL ? total : counts[t] || 0;
+            return `<button type="button" class="tag${isActive ? ' active' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)} <span>[${n}]</span></button>`;
+        }).join('');
+    }
 
-    let activeTag = null;
-    let ideas = [];
-    let lang = 'en';
+    function renderLLMToggles() {
+        llmFiltersEl.innerHTML = llmLevels.map((l, idx) => {
+            const isActive = l === activeLLMLevel;
+            return `<button type="button" class="tag${isActive ? ' active' : ''}" data-llm="${l}">${l === ALL ? 'All' : llmLevels.length - idx}</button>`;
+        }).join('');
+    }
+
+    function applyFilters() {
+        render(ideas, activeTag, lang);
+        renderTags(activeTag, countTags(ideas));
+        renderLLMToggles();
+    }
 
     tagsEl.addEventListener('click', (e) => {
         const btn = e.target.closest('button.tag');
         if (!btn) return;
         const selected = btn.dataset.tag;
         activeTag = selected === ALL ? null : selected;
-        render(ideas, activeTag, lang);
-        renderTags(activeTag, countTags(ideas));
+        applyFilters();
     });
 
     ul.addEventListener('click', (e) => {
         const tagEl = e.target.closest('.idea-tag');
         if (!tagEl) return;
-        const selected = tagEl.dataset.tag;
-        activeTag = selected;
-        render(ideas, activeTag, lang);
-        renderTags(activeTag, countTags(ideas));
+        activeTag = tagEl.dataset.tag;
+        applyFilters();
+    });
+
+    llmFiltersEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('button.tag');
+        if (!btn) return;
+        const val = btn.dataset.llm;
+        activeLLMLevel = val;
+        applyFilters();
     });
 
     fetch('20k200_en_results_dedup_tagged.json')
         .then((res) => res.json())
         .then((data) => {
-            ideas = data;
+            ideas = data.filter(i => i.llmCanDoIt !== 'VERY LIKELY');
             ideas.sort((a, b) => getScore(b) - getScore(a));
-            renderTags(activeTag, countTags(ideas));
-            render(ideas, activeTag, lang);
+            applyFilters();
         })
         .catch((err) => {
             ul.innerHTML = `<li><em>Failed to load ideas.json</em></li>`;
@@ -240,19 +217,15 @@
 
     function setLanguage(newLang) {
         lang = newLang;
-
-        // Update active button
         for (const [code, btn] of Object.entries(langButtons)) {
             btn.classList.toggle('active', code === newLang);
         }
-
-        // Re-render results
-        render(ideas, activeTag, lang);
+        applyFilters();
     }
 
-    // Attach event listeners
     langButtons.en.addEventListener('click', () => setLanguage('en'));
     langButtons.sr.addEventListener('click', () => setLanguage('sr'));
 </script>
+
 </body>
 </html>
