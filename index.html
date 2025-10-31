@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>App Ideas</title>
+<style>
+    body {
+        font: 16px system-ui, sans-serif;
+        margin: 2rem;
+    }
+    label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: bold;
+    }
+    input[type='search'] {
+        width: 100%;
+        max-width: 28rem;
+        padding: 0.5rem 0.6rem;
+        font-size: 15px;
+    }
+    .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+    .tag {
+        border: 1px solid #ccc;
+        background: #f7f7f7;
+        padding: 0.25rem 0.35rem;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+    .tag span {
+        opacity: 0.4;
+        color: green;
+    }
+    .tag.active {
+        background: #1a73e8;
+        color: #fff;
+        border-color: #1a73e8;
+    }
+    .tag.active span {
+        opacity: 1;
+        color: white;
+    }
+    ul {
+        margin-top: 1.5rem;
+        padding-left: 0;
+        list-style: none;
+    }
+    li {
+        margin-bottom: 1.5rem;
+    }
+    .idea-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 0.4rem;
+    }
+    .idea-tag {
+        background: #eef3ff;
+        border: 1px solid #ccd9ff;
+        padding: 0.25rem 0.5rem;
+        border-radius: 999px;
+        font-size: 13px;
+        cursor: pointer;
+    }
+    div {
+        padding-bottom: 7px;
+    }
+</style>
+<body>
+<label>App ideas: for ChatGPT apps (or general)</label>
+<!--<input id="q" type="search" placeholder="Search" autocomplete="off" />-->
+<div id="tags" class="tags" aria-label="Tag filters"></div>
+<ul id="results"></ul>
+<script>
+    const q = document.getElementById('q');
+    const ul = document.getElementById('results');
+    const tagsEl = document.getElementById('tags');
+    const ALL = 'All';
+
+    const escapeHtml = (s) =>
+        s.replace(
+            /[&<>"']/g,
+            (c) =>
+                ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;',
+                })[c],
+        );
+
+    const tags = [
+        'AI/ML',
+        'LLM',
+        'Code Generation',
+        'Data Extraction',
+        'Financial Tech',
+        'Trading',
+        'E-commerce',
+        'Health Tech',
+        'Mental Wellness',
+        'Legal Tech',
+        'Compliance',
+        'Automation',
+        'Visualization',
+        'DevOps',
+        'Gaming',
+        'Education',
+        'IoT/Hardware',
+        'Security',
+        'Content Creation',
+        'Personalized Advice',
+        'Engineering',
+    ];
+
+    function getScore(idea) {
+        let score = Math.floor((idea.score || 0) / 4);
+        if (
+            idea.devLen === 'LESS THAN A WEEK' ||
+            idea.devLen === 'LESS THAN A MONTH'
+        ) {
+            score += 3;
+        }
+        if (
+            idea.numUsers === '1 thousand or less' ||
+            idea.numUsers === '10 thousand'
+        ) {
+            score = 0;
+        }
+        return score;
+    }
+
+    const render = (rows, tag, lang) => {
+        const filtered = tag
+            ? rows.filter((r) => (r.tags || []).includes(tag))
+            : rows;
+        ul.innerHTML = filtered.length
+            ? filtered
+                .map(
+                    (r) => `<li>
+  <div style="font-weight: 550;">${escapeHtml(lang === 'en' ? r.userNeed : (r.userNeed_sr || r.userNeed))}</div>
+  <div style="display: none;"><b>App name:</b> ${escapeHtml(r.softwareName)}</div>
+  <div style="opacity: 0.6;">[app idea]: ${escapeHtml(r.description)}</div>
+  <div class="idea-tags">
+    ${(r.tags || [])
+                        .map(
+                            (t) =>
+                                `<span class="idea-tag" data-tag="${escapeHtml(
+                                    t,
+                                )}">${escapeHtml(t)}</span>`,
+                        )
+                        .join('')}
+  </div>
+</li>`,
+                )
+                .join('')
+            : `<li><em>No results.</em></li>`;
+    };
+
+    const countTags = (rows) => {
+        const counts = {};
+        for (const r of rows) {
+            for (const t of r.tags || []) {
+                counts[t] = (counts[t] || 0) + 1;
+            }
+        }
+        return counts;
+    };
+
+    const renderTags = (activeTag, counts) => {
+        const list = [ALL, ...tags];
+        const total = ideas.length;
+        tagsEl.innerHTML = list
+            .map((t) => {
+                const isActive = activeTag
+                    ? t === activeTag
+                    : t === ALL;
+                const n =
+                    t === ALL
+                        ? total
+                        : counts && counts[t]
+                            ? counts[t]
+                            : 0;
+                return `<button type="button" class="tag${
+                    isActive ? ' active' : ''
+                }" data-tag="${escapeHtml(t)}">${escapeHtml(
+                    t,
+                )} <span>[${n}]</span></button>`;
+            })
+            .join('');
+    };
+
+    let activeTag = null;
+    let ideas = [];
+    let lang = 'sr';
+
+    tagsEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('button.tag');
+        if (!btn) return;
+        const selected = btn.dataset.tag;
+        activeTag = selected === ALL ? null : selected;
+        render(ideas, activeTag, lang);
+        renderTags(activeTag, countTags(ideas));
+    });
+
+    ul.addEventListener('click', (e) => {
+        const tagEl = e.target.closest('.idea-tag');
+        if (!tagEl) return;
+        const selected = tagEl.dataset.tag;
+        activeTag = selected;
+        render(ideas, activeTag, lang);
+        renderTags(activeTag, countTags(ideas));
+    });
+
+    fetch('20k200_en_results_dedup_tagged.json')
+        .then((res) => res.json())
+        .then((data) => {
+            ideas = data;
+            ideas.sort((a, b) => getScore(b) - getScore(a));
+            renderTags(activeTag, countTags(ideas));
+            render(ideas, activeTag, lang);
+        })
+        .catch((err) => {
+            ul.innerHTML = `<li><em>Failed to load ideas.json</em></li>`;
+            console.error(err);
+        });
+</script>
+</body>
+</html>
